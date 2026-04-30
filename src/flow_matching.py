@@ -8,12 +8,36 @@ from tqdm import trange
 
 PredictionType = Literal["x", "v"]
 LossType = Literal["x", "v"]
+TimeSchedule = Literal["uniform", "shift_high_noise", "shift_low_noise"]
 
 
 def cycle(loader: DataLoader) -> Iterable[torch.Tensor]:
     while True:
         for batch in loader:
             yield batch
+
+
+def sample_training_times(
+    batch_size: int,
+    *,
+    device: torch.device | str,
+    t_eps: float,
+    schedule: TimeSchedule = "uniform",
+    shift: float = 1.0,
+) -> torch.Tensor:
+    u = t_eps + (1 - 2 * t_eps) * torch.rand(batch_size, 1, device=device)
+    if schedule == "uniform":
+        return u
+
+    logits = torch.logit(u)
+    if schedule == "shift_high_noise":
+        shifted = torch.sigmoid(logits + shift)
+    elif schedule == "shift_low_noise":
+        shifted = torch.sigmoid(logits - shift)
+    else:
+        raise ValueError(f"Unknown time schedule={schedule!r}")
+
+    return shifted.clamp(t_eps, 1 - t_eps)
 
 
 def predictions_from_output(
@@ -49,6 +73,8 @@ def train_flow_matching(
     log_every: int = 1_000,
     t_eps: float = 1e-4,
     show_progress: bool = True,
+    time_schedule: TimeSchedule = "uniform",
+    time_shift: float = 1.0,
 ) -> list[float]:
     model.to(device)
     model.train()
@@ -64,8 +90,17 @@ def train_flow_matching(
         disable=not show_progress,
     )
     for step in progress:
-        x = next(batches).to(device=device, dtype=torch.float32)
-        t = t_eps + (1 - 2 * t_eps) * torch.rand(x.shape[0], 1, device=device)
+        batch = next(batches)
+        if isinstance(batch, (tuple, list)):
+            batch = batch[0]
+        x = batch.to(device=device, dtype=torch.float32)
+        t = sample_training_times(
+            x.shape[0],
+            device=device,
+            t_eps=t_eps,
+            schedule=time_schedule,
+            shift=time_shift,
+        )
         eps = torch.randn_like(x)
         z_t = (1 - t) * x + t * eps
         target_v = eps - x
