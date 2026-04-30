@@ -1,5 +1,6 @@
 # Python-generated files
 __pycache__/
+.matplotlib_cache/
 *.py[oc]
 build/
 dist/
@@ -9,6 +10,7 @@ wheels/
 # Virtual environments
 .venv
 data
+outputs/
 checkpoints*
 results
 __pycache__/
