@@ -9,6 +9,7 @@ from tqdm import trange
 PredictionType = Literal["x", "v"]
 LossType = Literal["x", "v"]
 TimeSchedule = Literal["uniform", "shift_high_noise", "shift_low_noise"]
+MeanFlowHorizonSchedule = Literal["uniform", "large", "endpoint_mix"]
 
 
 def cycle(loader: DataLoader) -> Iterable[torch.Tensor]:
@@ -155,7 +156,10 @@ def train_mean_flow(
     device: torch.device | str = "cpu",
     log_every: int = 1_000,
     t_eps: float = 1e-4,
+    t_max: float | None = None,
     mean_ratio: float = 0.5,
+    horizon_schedule: MeanFlowHorizonSchedule = "uniform",
+    endpoint_prob: float = 0.25,
     show_progress: bool = True,
 ) -> list[float]:
     model.to(device)
@@ -177,14 +181,26 @@ def train_mean_flow(
             batch = batch[0]
         x = batch.to(device=device, dtype=torch.float32)
         batch_size = x.shape[0]
-        t = sample_training_times(batch_size, device=device, t_eps=t_eps)
+        upper_t = 1.0 - t_eps if t_max is None else t_max
+        t = t_eps + (upper_t - t_eps) * torch.rand(batch_size, 1, device=device)
         eps = torch.randn_like(x)
         v = eps - x
         z_t = x + t * v
 
         mean_mask = torch.rand(batch_size, 1, device=device) < mean_ratio
-        r = torch.rand(batch_size, 1, device=device) * t
-        h = torch.where(mean_mask, t - r, torch.zeros_like(t))
+        if horizon_schedule == "uniform":
+            h_mean = torch.rand(batch_size, 1, device=device) * t
+        elif horizon_schedule == "large":
+            u = torch.rand(batch_size, 1, device=device)
+            h_mean = t * (1.0 - u.square())
+        elif horizon_schedule == "endpoint_mix":
+            u = torch.rand(batch_size, 1, device=device)
+            large_h = t * (1.0 - u.square())
+            endpoint_mask = torch.rand(batch_size, 1, device=device) < endpoint_prob
+            h_mean = torch.where(endpoint_mask, t, large_h)
+        else:
+            raise ValueError(f"Unknown horizon_schedule={horizon_schedule!r}")
+        h = torch.where(mean_mask, h_mean, torch.zeros_like(t))
 
         ones = torch.ones_like(t)
 

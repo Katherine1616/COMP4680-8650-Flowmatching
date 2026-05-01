@@ -153,6 +153,7 @@ def save_comparison_grid(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Part 4.2 MeanFlow experiments.")
+    parser.add_argument("--output-name", default="meanflow")
     parser.add_argument("--datasets", default="all")
     parser.add_argument("--dim", type=int, default=32)
     parser.add_argument("--train-steps", type=int, default=50_000)
@@ -162,6 +163,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hidden-layers", type=int, default=5)
     parser.add_argument("--mean-ratio", type=float, default=0.5)
     parser.add_argument("--t-eps", type=float, default=1e-2)
+    parser.add_argument("--t-max", type=float, default=None)
+    parser.add_argument("--horizon-schedule", default="uniform", choices=("uniform", "large", "endpoint_mix"))
+    parser.add_argument("--endpoint-prob", type=float, default=0.25)
     parser.add_argument("--num-samples", type=int, default=4096)
     parser.add_argument("--meanflow-steps", default=",".join(str(x) for x in DEFAULT_MEANFLOW_STEPS))
     parser.add_argument("--fm-steps", default=",".join(str(x) for x in DEFAULT_FM_STEPS))
@@ -175,7 +179,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    output_dir = OUTPUT_BASE_DIR
+    output_dir = ROOT / "outputs" / "part4" / args.output_name
     output_dir.mkdir(parents=True, exist_ok=True)
     device = choose_device()
     datasets = AVAILABLE_DATASETS if args.datasets == "all" else tuple(args.datasets.split(","))
@@ -192,6 +196,9 @@ def main() -> None:
         "hidden_layers": args.hidden_layers,
         "mean_ratio": args.mean_ratio,
         "t_eps": args.t_eps,
+        "t_max": args.t_max,
+        "horizon_schedule": args.horizon_schedule,
+        "endpoint_prob": args.endpoint_prob,
         "num_samples": args.num_samples,
         "meanflow_steps": meanflow_steps,
         "fm_baseline": {
@@ -230,7 +237,10 @@ def main() -> None:
                 device=device,
                 log_every=max(1, args.train_steps // 25),
                 t_eps=args.t_eps,
+                t_max=args.t_max,
                 mean_ratio=args.mean_ratio,
+                horizon_schedule=args.horizon_schedule,
+                endpoint_prob=args.endpoint_prob,
                 show_progress=not args.no_progress,
             )
             train_seconds = time.perf_counter() - start_time

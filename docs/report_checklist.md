@@ -572,14 +572,79 @@ Planned Part 4.2 comparisons:
 
 Observed 6.2 results:
 
-- Fill after running `scripts/part4_meanflow.py` on Colab/A100.
-- Record per dataset:
-  - One-step quality:
-  - Two-step quality:
-  - Five-step quality:
-  - Comparison against standard flow matching:
-  - Artifacts:
-  - Approximate training time:
+- Ran `scripts/part4_meanflow.py --skip-existing --no-progress` on Colab A100.
+- Hyperparameters:
+  - `D=32`
+  - `50,000` training steps per dataset
+  - batch size `1024`
+  - hidden width `256`
+  - `mean_ratio=0.5`
+  - MeanFlow sampling steps: `1`, `2`, `5`
+  - FM comparison steps: `1`, `2`, `5`, `10`, `20`, `50`
+- Training times:
+  - `swiss_roll`: `477.7s`, about `8.0` minutes.
+  - `gaussians`: `480.3s`, about `8.0` minutes.
+  - `circles`: `484.2s`, about `8.1` minutes.
+- Output files:
+  - `outputs/part4/meanflow/meanflow_results.json`
+  - `outputs/part4/meanflow/comparison_swiss_roll_d32.png`
+  - `outputs/part4/meanflow/comparison_gaussians_d32.png`
+  - `outputs/part4/meanflow/comparison_circles_d32.png`
+  - Required 9 MeanFlow figures: `meanflow_{dataset}_d32_{1,2,5}_steps.png`.
+
+Observed quality:
+
+- `swiss_roll`:
+  - MeanFlow 1 step: fails to match the clean spiral. It produces broad, noisy diagonal/clustered structure with only a weak spiral-like arrangement.
+  - MeanFlow 2 steps: somewhat more global spiral/circular organization appears, but it is still diffuse and off-manifold.
+  - MeanFlow 5 steps: clearer spiral-like mass, but still much noisier than standard FM at 20/50 steps.
+  - Standard FM comparison: 1-2 Euler steps fail, 5 steps is coarse, 10 steps begins to form the roll, and 20/50 steps are much cleaner.
+- `gaussians`:
+  - MeanFlow 1 step: fails to recover separated modes; samples form a diffuse connected cloud/ring with blurred clusters.
+  - MeanFlow 2 steps: several modes begin to appear, but there is heavy bridge mass between modes.
+  - MeanFlow 5 steps: ring-like arrangement is visible, but modes remain connected and less sharp than standard FM 20/50 steps.
+  - Standard FM comparison: 20 and 50 steps recover the eight modes much more cleanly, although still with some outliers/bridges.
+- `circles`:
+  - MeanFlow 1 step: fails; samples are a noisy central blob/partial annulus rather than two rings.
+  - MeanFlow 2 steps: still diffuse; two-ring structure is not clean.
+  - MeanFlow 5 steps: partial two-ring structure begins to appear, but the middle is heavily filled.
+  - Standard FM comparison: also poor at very low step counts, but 20/50 steps are closer to the ground-truth rings than MeanFlow 5 steps.
+
+Overall 6.2 conclusion:
+
+- This MeanFlow implementation produced the requested 9 figures and tests the intended one-step/few-step setup.
+- In this toy setting, with width 256 and 50K steps, MeanFlow did not successfully outperform well-integrated standard flow matching.
+- It improves from 1 to 5 steps, which suggests the learned interval velocity is useful, but one-step generation is still poor.
+- The likely issue is under-training/under-capacity for the harder MeanFlow objective: the target depends on a JVP of the model itself, and the model must learn accurate long-horizon average velocities rather than local instantaneous velocities.
+- The clearest artifact is mode/structure smoothing:
+  - `gaussians` shows bridge mass between separated modes.
+  - `circles` fills the space between rings.
+  - `swiss_roll` loses the thin manifold and becomes a diffuse spiral-like cloud.
+
+Planned second 6.2 attempt:
+
+- Keep the first experiment unchanged in `outputs/part4/meanflow/`.
+- Run a second, non-overwriting attempt in `outputs/part4/meanflow_large_horizon/`.
+- Motivation:
+  - The first run trains many small/medium horizons but one-step sampling uses the extreme interval `(t=1, h=1)`.
+  - The second run keeps the assignment-required structure but gives the model more direct long-horizon supervision.
+- Configuration:
+  - `D=32`
+  - output directory: `outputs/part4/meanflow_large_horizon/`
+  - `100,000` training steps per dataset
+  - hidden width `512`
+  - `mean_ratio=0.5`
+  - `horizon_schedule=endpoint_mix`
+  - `endpoint_prob=0.5`
+  - `t_max=1.0`
+  - MeanFlow sampling steps: `1`, `2`, `5`
+  - same standard FM comparison: Part 2 `x`-pred/`v`-loss with `1`, `2`, `5`, `10`, `20`, `50` Euler steps.
+- What to report after running:
+  - Include the first run as the conservative baseline MeanFlow implementation.
+  - Include this second run as the targeted large-horizon attempt.
+  - Compare whether large-horizon supervision improves 1-step and 2-step samples.
+  - If it improves but still does not fully match 20/50-step FM, explain the remaining gap as a capacity/objective difficulty rather than a violation of the assignment.
+  - If it succeeds, note that the main missing ingredient in the first run was coverage of the long intervals used at sampling.
 
 ### 4.3 Part 4 Questions
 
@@ -645,10 +710,9 @@ Question 5: Compare MeanFlow-generated samples against ground truth across all t
 
 Answer draft:
 
-- Fill after running 6.2.
-- Expected discussion points:
-  - Whether one-step samples already show the correct global structure.
-  - Whether 2-step or 5-step sampling improves sharpness and removes off-manifold scatter.
-  - Whether `gaussians` has mode-bridging artifacts, mode collapse, or blurred modes.
-  - If `gaussians` artifacts appear, a likely reason is that one interval average velocity can smooth across separated modes, especially where the trajectory must choose between multiple disconnected clusters.
-  - If artifacts do not appear, state that the learned average velocity separated the modes well, and support it with the saved figures.
+- MeanFlow samples improve as the number of sampling steps increases from 1 to 5, but the model does not produce clean one-step samples in this run.
+- On `swiss_roll`, MeanFlow 1 step gives a diffuse cloud with weak spiral structure. Two and five steps improve the global spiral-like arrangement, but samples remain noisy and off the thin manifold. Standard flow matching with 20/50 Euler steps is clearly cleaner.
+- On `gaussians`, MeanFlow 1 step produces a connected blurred cloud/ring rather than separated modes. Two and five steps reveal mode locations, but there is strong bridge mass between modes. This is the most visible artifact.
+- On `circles`, MeanFlow 1 and 2 steps mostly fill the center. Five steps begins to show two rings, but the middle remains too dense compared with ground truth.
+- A plausible explanation is that average-velocity prediction over a long interval smooths across separated or curved structures when the learned field is not accurate enough. For `gaussians`, the model must route noise samples to one of several disconnected modes; an imperfect average velocity tends to interpolate between modes, creating bridges. For `circles`, imperfect long-horizon transport fills the low-density region between rings.
+- Therefore, the experiment supports the idea behind MeanFlow but does not fully reproduce high-quality one-step generation under this small toy MLP configuration.
