@@ -1,0 +1,149 @@
+{
+  "paper": "MeanFlow, arXiv:2505.13447",
+  "dim": 32,
+  "train_steps": 50000,
+  "batch_size": 1024,
+  "lr": 0.001,
+  "hidden_dim": 256,
+  "hidden_layers": 5,
+  "mean_ratio": 0.5,
+  "t_eps": 0.01,
+  "num_samples": 4096,
+  "meanflow_steps": [
+    1,
+    2,
+    5
+  ],
+  "fm_baseline": {
+    "prediction": "x",
+    "loss": "v",
+    "steps": [
+      1,
+      2,
+      5,
+      10,
+      20,
+      50
+    ]
+  },
+  "device": "cuda",
+  "datasets": {
+    "swiss_roll": {
+      "checkpoint": "outputs/part4/meanflow/meanflow_swiss_roll_d32.pt",
+      "train_seconds": 477.695182185,
+      "losses": [
+        1.03695547580719,
+        0.1390351504087448,
+        0.11556693911552429,
+        0.11022955179214478,
+        0.11342863738536835,
+        0.11773833632469177,
+        0.1157194972038269,
+        0.10936785489320755,
+        0.10896758735179901,
+        0.10608673095703125,
+        0.1165117621421814,
+        0.11004937440156937,
+        0.11467204988002777,
+        0.1102275550365448,
+        0.11448647081851959,
+        0.10853483527898788,
+        0.11793264001607895,
+        0.1182095855474472,
+        0.10500824451446533,
+        0.11508840322494507,
+        0.11477681994438171,
+        0.10719563066959381,
+        0.11692829430103302,
+        0.10849352926015854,
+        0.10513050854206085,
+        0.11958273500204086
+      ],
+      "meanflow_grid": "outputs/part4/meanflow/meanflow_swiss_roll_d32_steps_grid.png",
+      "meanflow_figures": [
+        "outputs/part4/meanflow/meanflow_swiss_roll_d32_1_steps.png",
+        "outputs/part4/meanflow/meanflow_swiss_roll_d32_2_steps.png",
+        "outputs/part4/meanflow/meanflow_swiss_roll_d32_5_steps.png"
+      ],
+      "comparison_grid": "outputs/part4/meanflow/comparison_swiss_roll_d32.png"
+    },
+    "gaussians": {
+      "checkpoint": "outputs/part4/meanflow/meanflow_gaussians_d32.pt",
+      "train_seconds": 480.3469196379999,
+      "losses": [
+        1.0318207740783691,
+        0.15047401189804077,
+        0.13318485021591187,
+        0.12961821258068085,
+        0.12832720577716827,
+        0.13015085458755493,
+        0.11750328540802002,
+        0.12161920219659805,
+        0.12109492719173431,
+        0.12330330908298492,
+        0.12822937965393066,
+        0.12285074591636658,
+        0.12545621395111084,
+        0.13717183470726013,
+        0.12488769739866257,
+        0.13024652004241943,
+        0.12158475816249847,
+        0.12650908529758453,
+        0.12921012938022614,
+        0.12917932868003845,
+        0.12682804465293884,
+        0.12944969534873962,
+        0.13009661436080933,
+        0.12870359420776367,
+        0.12322850525379181,
+        0.13122239708900452
+      ],
+      "meanflow_grid": "outputs/part4/meanflow/meanflow_gaussians_d32_steps_grid.png",
+      "meanflow_figures": [
+        "outputs/part4/meanflow/meanflow_gaussians_d32_1_steps.png",
+        "outputs/part4/meanflow/meanflow_gaussians_d32_2_steps.png",
+        "outputs/part4/meanflow/meanflow_gaussians_d32_5_steps.png"
+      ],
+      "comparison_grid": "outputs/part4/meanflow/comparison_gaussians_d32.png"
+    },
+    "circles": {
+      "checkpoint": "outputs/part4/meanflow/meanflow_circles_d32.pt",
+      "train_seconds": 484.210809786,
+      "losses": [
+        1.0131158828735352,
+        0.11028080433607101,
+        0.1089906096458435,
+        0.10298554599285126,
+        0.10450305044651031,
+        0.09685495495796204,
+        0.102861687541008,
+        0.09531237185001373,
+        0.10834894329309464,
+        0.10508894920349121,
+        0.09883251786231995,
+        0.10070410370826721,
+        0.10817355662584305,
+        0.10360948741436005,
+        0.10287381708621979,
+        0.10676181316375732,
+        0.09509114176034927,
+        0.09929044544696808,
+        0.10069442540407181,
+        0.10108651220798492,
+        0.09679144620895386,
+        0.10357053577899933,
+        0.09854249656200409,
+        0.09495493769645691,
+        0.10312823951244354,
+        0.09677906334400177
+      ],
+      "meanflow_grid": "outputs/part4/meanflow/meanflow_circles_d32_steps_grid.png",
+      "meanflow_figures": [
+        "outputs/part4/meanflow/meanflow_circles_d32_1_steps.png",
+        "outputs/part4/meanflow/meanflow_circles_d32_2_steps.png",
+        "outputs/part4/meanflow/meanflow_circles_d32_5_steps.png"
+      ],
+      "comparison_grid": "outputs/part4/meanflow/comparison_circles_d32.png"
+    }
+  }
+}
