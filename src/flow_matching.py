@@ -146,6 +146,91 @@ def train_v_prediction(
     )
 
 
+def train_mean_flow(
+    model: nn.Module,
+    dataloader: DataLoader,
+    *,
+    steps: int = 50_000,
+    lr: float = 1e-3,
+    device: torch.device | str = "cpu",
+    log_every: int = 1_000,
+    t_eps: float = 1e-4,
+    mean_ratio: float = 0.5,
+    show_progress: bool = True,
+) -> list[float]:
+    model.to(device)
+    model.train()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    mse = nn.MSELoss()
+    batches = cycle(dataloader)
+    losses: list[float] = []
+
+    progress = trange(
+        steps,
+        desc="meanflow",
+        leave=False,
+        disable=not show_progress,
+    )
+    for step in progress:
+        batch = next(batches)
+        if isinstance(batch, (tuple, list)):
+            batch = batch[0]
+        x = batch.to(device=device, dtype=torch.float32)
+        batch_size = x.shape[0]
+        t = sample_training_times(batch_size, device=device, t_eps=t_eps)
+        eps = torch.randn_like(x)
+        v = eps - x
+        z_t = x + t * v
+
+        mean_mask = torch.rand(batch_size, 1, device=device) < mean_ratio
+        r = torch.rand(batch_size, 1, device=device) * t
+        h = torch.where(mean_mask, t - r, torch.zeros_like(t))
+
+        ones = torch.ones_like(t)
+
+        def mean_velocity(z_in: torch.Tensor, t_in: torch.Tensor, h_in: torch.Tensor) -> torch.Tensor:
+            return model(z_in, t_in, h_in)
+
+        u, du_dt = torch.func.jvp(mean_velocity, (z_t, t, h), (v, ones, ones))
+        target = (v - h * du_dt).detach()
+        loss = mse(u, target)
+
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+        if step == 0 or (step + 1) % log_every == 0 or step + 1 == steps:
+            losses.append(float(loss.detach().cpu()))
+            progress.set_postfix(loss=f"{losses[-1]:.4f}")
+
+    return losses
+
+
+@torch.no_grad()
+def sample_mean_flow(
+    model: nn.Module,
+    *,
+    num_samples: int,
+    data_dim: int,
+    steps: int = 1,
+    device: torch.device | str = "cpu",
+) -> torch.Tensor:
+    model.to(device)
+    model.eval()
+    z = torch.randn(num_samples, data_dim, device=device)
+    dt = 1.0 / steps
+
+    for i in range(steps):
+        t_value = 1.0 - i * dt
+        h_value = min(dt, t_value)
+        t = torch.full((num_samples, 1), t_value, device=device)
+        h = torch.full((num_samples, 1), h_value, device=device)
+        u = model(z, t, h)
+        z = z - h * u
+
+    return z.cpu()
+
+
 @torch.no_grad()
 def sample_euler(
     model: nn.Module,
